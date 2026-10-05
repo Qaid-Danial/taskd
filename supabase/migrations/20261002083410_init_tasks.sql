@@ -87,3 +87,20 @@ end $$;
 create trigger tasks_audit
 after insert or update or delete on public.tasks
 for each row execute function public.tasks_audit();
+
+-- RLS
+
+alter table public.tasks enable row level security;
+
+create policy "own tasks" on public.tasks 
+    for all to authenticated
+    using (user_id = (select auth.uid()))
+    with check (user_id = (select auth.uid()));
+
+alter table public.task_events enable row level security;
+
+create policy "read on own events" on public.task_events
+    for select to authenticated
+    using (user_id = (select auth.uid()));
+
+alter publication supabase_realtime add table public.tasks;
