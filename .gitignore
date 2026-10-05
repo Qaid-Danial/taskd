@@ -12,3 +12,5 @@ supabase/.branches/
 *.exe
 node_modules/
 dist/
+
+secret.md
