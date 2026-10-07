@@ -105,6 +105,29 @@ Then add `https://<project-ref>.supabase.co/functions/v1/mcp/<secret>` as a cust
 
 Generate a secret with a cryptographic RNG: `openssl rand -hex 32`, or in PowerShell 7 `[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`.
 
+## To-Do
+
+### Go CLI (next up)
+- [ ] `taskd login`: sign in with an email OTP code from Supabase Auth
+- [ ] Store the refresh token in Windows Credential Manager (`go-keyring`), never in a plain file
+- [ ] `taskd today`, `taskd add`, `taskd done`: call PostgREST with the user's JWT, so RLS applies
+- [ ] Embed `time/tzdata` so "today" is Malaysia time on any machine
+- [ ] Interactive TUI (Bubble Tea) when run with no arguments
+
+### Auth
+- [ ] Finish email OTP: custom SMTP plus `{{ .Token }}` in the Magic Link template
+- [ ] Replace the URL secret with OAuth 2.1 for the MCP connector (Supabase Auth as the authorization server)
+- [ ] Have the MCP server act as the signed-in user instead of the service role, so RLS covers the Claude path too
+
+### Security and CI
+- [ ] gitleaks pre-commit hook
+- [ ] GitHub Actions: `supabase test db`, `deno check` / `deno lint`, Go tests, gitleaks
+- [ ] Branch protection on `main`
+
+### Later
+- [ ] Push reminders with ntfy, triggered by `pg_cron`
+- [ ] Web app with live updates via Supabase Realtime
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
