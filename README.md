@@ -1,6 +1,6 @@
 # taskd
 
-A personal task manager where Claude is the main interface. You ask Claude things like *"what's on today, sorted by priority?"* or *"push the logbook task to Friday"*, and Claude reads and edits a Supabase Postgres database through a custom, hand-written MCP server.
+A personal task manager where Claude is the main interface. You ask Claude things like *"what's on today, sorted by priority?"* or *"push the logbook task to Friday"*, and Claude reads and edits a Supabase Postgres database through a custom, hand-written MCP server. A Go terminal UI gives a quick keyboard-driven view of the same tasks.
 
 Built as a learning and portfolio project, with a focus on backend and security design.
 
@@ -11,11 +11,13 @@ flowchart LR
     C["Claude<br/>(claude.ai, mobile, Claude Code)"] -- "MCP over HTTPS<br/>/functions/v1/mcp/&lt;secret&gt;" --> F["Edge Function<br/>(TypeScript / Deno)"]
     F -- "supabase-js<br/>(service role, pinned to owner)" --> DB[("Postgres<br/>tasks + task_events")]
     DB -- "trigger" --> A["task_events<br/>(audit log)"]
+    T["Go TUI<br/>(Bubble Tea, read-only)"] -- "PostgREST over HTTPS<br/>(service role, pinned to owner)" --> DB
 ```
 
 - **MCP server**: a Supabase Edge Function that implements the MCP protocol by hand (JSON-RPC over stateless Streamable HTTP, no SDK). It supports protocol versions `2025-06-18` and `2025-03-26`.
 - **Database**: Postgres with Row Level Security, triggers for timestamps and auditing, and pgTAP tests.
-- **Time zone**: all "today" logic uses `Asia/Kuala_Lumpur`.
+- **Terminal UI**: a read-only Go app built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) that shows your tasks by day, week or month. It calls Supabase's REST API (PostgREST) directly with `net/http`.
+- **Time zone**: all "today" logic uses `Asia/Kuala_Lumpur`, in both the MCP server and the TUI.
 
 ## Security design
 
@@ -30,6 +32,7 @@ flowchart LR
 | Trigger hardening | Trigger functions run with `set search_path = ''` and fully qualified names, to prevent search-path hijacking. |
 | Tenant isolation | RLS policies (`user_id = (select auth.uid())`) on both tables, verified by pgTAP tests. |
 | Secrets in git | `.env` files are git-ignored. Production secrets live in `supabase secrets`. |
+| TUI credentials (v0.9) | The TUI is read-only (GET requests only). Its key lives in a user environment variable, never in the repo. One function adds the owner filter to every query, the user ID and dates are validated before they reach the query string, and `https` is enforced. Only the `store` package ever sees the key. Temporary until OTP login (see To-Do). |
 
 ## MCP tools
 
@@ -55,6 +58,10 @@ Priority runs from **1** (urgent and important) to **4** (someday). Dates are `Y
 ## Project layout
 
 ```
+cmd/taskd/main.go             # TUI entry point: reads config, starts the app
+internal/
+├── store/                    # Supabase REST client (the only code that sees the key)
+└── tui/                      # Bubble Tea model, views, date logic
 supabase/
 ├── config.toml               # local stack config (verify_jwt = false for the mcp function)
 ├── migrations/               # schema, triggers, RLS
@@ -92,6 +99,36 @@ supabase functions serve mcp --env-file supabase/functions/.env
 
 The local endpoint is `http://127.0.0.1:54321/functions/v1/mcp/<MCP_SECRET>`. Test it with the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) or Claude Code.
 
+## Terminal UI
+
+Requires Go 1.26 or newer.
+
+Set three user environment variables (PowerShell). Type the key at a hidden prompt so it never lands in your shell history:
+
+```powershell
+[Environment]::SetEnvironmentVariable("TASKD_SUPABASE_URL", "https://<project-ref>.supabase.co", "User")
+[Environment]::SetEnvironmentVariable("TASKD_USER_ID", "<your auth user id>", "User")
+$s = Read-Host "Service role key" -AsSecureString
+[Environment]::SetEnvironmentVariable("TASKD_SERVICE_ROLE_KEY", [System.Net.NetworkCredential]::new("", $s).Password, "User")
+Remove-Variable s
+```
+
+Open a new terminal, then:
+
+```bash
+go test ./...
+go run ./cmd/taskd             # or: go build -o taskd.exe ./cmd/taskd
+```
+
+| Key | Action |
+|---|---|
+| `j` / `k`, `↓` / `↑` | Move |
+| `Tab`, `1` `2` `3` | Day / Week / Month |
+| `←` / `→`, `t` | Previous / next period, back to today |
+| `Enter`, `Esc` | Task details, back |
+| `h` | Hide or show finished tasks |
+| `r`, `q` | Refresh, quit |
+
 ## Deploying
 
 ```bash
@@ -107,12 +144,14 @@ Generate a secret with a cryptographic RNG: `openssl rand -hex 32`, or in PowerS
 
 ## To-Do
 
-### Go CLI (next up)
+### Go CLI / TUI
+- [x] Read-only Bubble Tea TUI with Day, Week and Month views (v0.9)
+- [x] Embed `time/tzdata` so "today" is Malaysia time on any machine
+- [ ] Replace the service role key in the TUI with email OTP login (user JWT, so RLS applies)
 - [ ] `taskd login`: sign in with an email OTP code from Supabase Auth
 - [ ] Store the refresh token in Windows Credential Manager (`go-keyring`), never in a plain file
-- [ ] `taskd today`, `taskd add`, `taskd done`: call PostgREST with the user's JWT, so RLS applies
-- [ ] Embed `time/tzdata` so "today" is Malaysia time on any machine
-- [ ] Interactive TUI (Bubble Tea) when run with no arguments
+- [ ] Editing in the TUI: mark done, add, reschedule
+- [ ] `taskd today`, `taskd add`, `taskd done`: one-shot commands for scripts
 
 ### Auth
 - [ ] Finish email OTP: custom SMTP plus `{{ .Token }}` in the Magic Link template
