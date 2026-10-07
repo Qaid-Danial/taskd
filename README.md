@@ -62,6 +62,7 @@ cmd/taskd/main.go             # TUI entry point: reads config, starts the app
 internal/
 ├── store/                    # Supabase REST client (the only code that sees the key)
 └── tui/                      # Bubble Tea model, views, date logic
+scripts/install-taskd.ps1     # build the TUI and add it to your user PATH
 supabase/
 ├── config.toml               # local stack config (verify_jwt = false for the mcp function)
 ├── migrations/               # schema, triggers, RLS
@@ -113,11 +114,20 @@ $s = Read-Host "Service role key" -AsSecureString
 Remove-Variable s
 ```
 
-Open a new terminal, then:
+Open a new terminal, then install it so `taskd` works from anywhere:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-taskd.ps1
+taskd
+```
+
+The script runs the Go tests, builds `taskd.exe` into `%LOCALAPPDATA%\Programs\taskd`, and adds that folder to your user PATH once (no admin rights needed). Rerun it after pulling new code to rebuild. Options: `-SkipTests` skips the tests, and `-Uninstall` removes the exe and the PATH entry.
+
+For development, run it without installing:
 
 ```bash
 go test ./...
-go run ./cmd/taskd             # or: go build -o taskd.exe ./cmd/taskd
+go run ./cmd/taskd
 ```
 
 | Key | Action |
