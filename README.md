@@ -58,12 +58,15 @@ Priority runs from **1** (urgent and important) to **4** (someday). Dates are `Y
 ## Project layout
 
 ```
+taskd.env.example             # TUI config template (no real values)
 cmd/taskd/main.go             # TUI entry point: reads config, starts the app
 internal/
 ├── store/                    # Supabase REST client (the only code that sees the key)
 └── tui/                      # Bubble Tea model, views, date logic
-scripts/install-taskd.ps1     # build the TUI and add it to your user PATH
+scripts/install-taskd.ps1     # Windows: build the TUI and add it to your user PATH
+scripts/install-taskd.sh      # Linux: same, installs to ~/.local/bin
 supabase/
+├── functions/.env.example    # MCP server config template (no real values)
 ├── config.toml               # local stack config (verify_jwt = false for the mcp function)
 ├── migrations/               # schema, triggers, RLS
 ├── functions/mcp/
@@ -75,6 +78,17 @@ supabase/
 └── seed.sql                  # local-only sample user + tasks
 ```
 
+## Configuration
+
+**New here? Read the two config templates first.** taskd has two separate programs that reach Supabase in different ways, so each has its own template, kept next to what uses it:
+
+| Template | Used by | Values | Where the real values go |
+|---|---|---|---|
+| [`supabase/functions/.env.example`](supabase/functions/.env.example) | MCP server | `MCP_SECRET` (generate it), `OWNER_USER_ID` | `supabase/functions/.env` locally, `supabase secrets` when hosted |
+| [`taskd.env.example`](taskd.env.example) | Terminal UI | `TASKD_SUPABASE_URL`, `TASKD_SERVICE_ROLE_KEY`, `TASKD_USER_ID` | Your environment: `~/.config/taskd/env` on Linux, user environment variables on Windows |
+
+Each template explains every value: what it is, whether it's a secret, and how to get or generate it. The templates are committed and hold no real values. The files with real values are git-ignored or live outside the repo.
+
 ## Running locally
 
 Requires Docker, the [Supabase CLI](https://supabase.com/docs/guides/cli) and Deno.
@@ -85,11 +99,10 @@ supabase db reset              # apply migrations + seed data
 supabase test db               # run the pgTAP tests
 ```
 
-Create `supabase/functions/.env` (it's git-ignored):
+Copy the MCP template and fill it in (for the seeded local user, `OWNER_USER_ID=00000000-0000-0000-0000-000000000001`):
 
-```
-MCP_SECRET=<64 random characters>
-OWNER_USER_ID=00000000-0000-0000-0000-000000000001   # the seeded local user
+```bash
+cp supabase/functions/.env.example supabase/functions/.env
 ```
 
 Then serve the function:
@@ -104,7 +117,11 @@ The local endpoint is `http://127.0.0.1:54321/functions/v1/mcp/<MCP_SECRET>`. Te
 
 Requires Go 1.26 or newer.
 
-Set three user environment variables (PowerShell). Type the key at a hidden prompt so it never lands in your shell history:
+The TUI reads three environment variables: `TASKD_SUPABASE_URL`, `TASKD_USER_ID` and `TASKD_SERVICE_ROLE_KEY`. [`taskd.env.example`](taskd.env.example) explains where to find each one. Set them as shown below, then run the install script for your OS. Both install scripts run the Go tests, build the binary, and add its folder to your PATH once, with no admin rights or sudo. Rerun the script after pulling new code to rebuild.
+
+### Windows (PowerShell)
+
+Set the variables for your user. Type the key at a hidden prompt so it never lands in your shell history:
 
 ```powershell
 [Environment]::SetEnvironmentVariable("TASKD_SUPABASE_URL", "https://<project-ref>.supabase.co", "User")
@@ -114,16 +131,38 @@ $s = Read-Host "Service role key" -AsSecureString
 Remove-Variable s
 ```
 
-Open a new terminal, then install it so `taskd` works from anywhere:
+Open a new terminal, then install:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install-taskd.ps1
 taskd
 ```
 
-The script runs the Go tests, builds `taskd.exe` into `%LOCALAPPDATA%\Programs\taskd`, and adds that folder to your user PATH once (no admin rights needed). Rerun it after pulling new code to rebuild. Options: `-SkipTests` skips the tests, and `-Uninstall` removes the exe and the PATH entry.
+This installs `taskd.exe` to `%LOCALAPPDATA%\Programs\taskd`. Options: `-SkipTests` skips the tests, and `-Uninstall` removes the exe and the PATH entry.
 
-For development, run it without installing:
+### Linux (bash or zsh)
+
+Copy the TUI template to a file only you can read, fill in the three values, and load it from your shell's rc file:
+
+```bash
+mkdir -p ~/.config/taskd
+install -m 600 taskd.env.example ~/.config/taskd/env
+nano ~/.config/taskd/env      # fill in the three values
+echo '[ -f ~/.config/taskd/env ] && . ~/.config/taskd/env' >> ~/.bashrc   # or ~/.zshrc
+```
+
+Open a new terminal, then install:
+
+```bash
+./scripts/install-taskd.sh
+taskd
+```
+
+This installs `taskd` to `~/.local/bin` (set `TASKD_INSTALL_DIR` to change it). If that folder isn't on your PATH yet, the script adds one line to `~/.bashrc` or `~/.zshrc`. Options: `--skip-tests` skips the tests, and `--uninstall` removes the binary and that line.
+
+### Development
+
+Run it without installing:
 
 ```bash
 go test ./...
@@ -150,7 +189,7 @@ supabase functions deploy mcp
 
 Then add `https://<project-ref>.supabase.co/functions/v1/mcp/<secret>` as a custom connector in Claude.
 
-Generate a secret with a cryptographic RNG: `openssl rand -hex 32`, or in PowerShell 7 `[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`.
+Use a different `MCP_SECRET` in production than locally. See [`supabase/functions/.env.example`](supabase/functions/.env.example) for how to generate it and where to find your user ID.
 
 ## To-Do
 
