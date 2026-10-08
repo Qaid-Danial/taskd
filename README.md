@@ -26,9 +26,9 @@ flowchart LR
 | Endpoint access | A 64-character secret as the last URL segment, compared in constant time (both sides hashed with SHA-256 first, so length doesn't leak either). A wrong secret gets a plain `404`, so the endpoint doesn't reveal it exists. |
 | Service-role blast radius | The function uses the service role key, so every query is explicitly pinned to `OWNER_USER_ID`. |
 | Over-posting | Writes go through an allow-list (`pick()`), so Claude can only set known task fields. |
-| Destructive actions | There is no delete tool. Tasks are archived, never deleted. |
+| Destructive actions | The MCP server has no delete tool, so Claude can only archive tasks. The RLS policy still lets a signed-in user delete their own rows, and every delete is recorded in `task_events`. |
 | Accountability | An `after insert/update/delete` trigger writes every change to `task_events`, labelled `claude` (service role), `user` (authenticated JWT) or `system` (no JWT). |
-| Audit integrity | `task_events` is select-only for clients (there's no insert policy), so history can only be written by the trigger. |
+| Audit integrity | `task_events` is select-only for clients (there's no insert, update or delete policy), so signed-in users can't forge or edit history; only the trigger writes it. The service role bypasses RLS, so anyone holding that key (the MCP server, and the TUI until OTP login) could still write to it directly. |
 | Trigger hardening | Trigger functions run with `set search_path = ''` and fully qualified names, to prevent search-path hijacking. |
 | Tenant isolation | RLS policies (`user_id = (select auth.uid())`) on both tables, verified by pgTAP tests. |
 | Secrets in git | `.env` files are git-ignored. Production secrets live in `supabase secrets`. |
@@ -43,7 +43,7 @@ flowchart LR
 | `add_task` | Create a task |
 | `update_task` | Change fields on one task |
 | `complete_task` | Mark a task done |
-| `archive_task` | Archive a task (nothing is ever deleted) |
+| `archive_task` | Archive a task (Claude can't delete tasks) |
 | `reorder_tasks` | Set `sort_order` and/or `priority` on up to 50 tasks |
 | `get_task_history` | Recent changes to a task and who made them, for review or undo |
 

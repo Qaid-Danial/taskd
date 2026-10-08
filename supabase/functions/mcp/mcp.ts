@@ -58,7 +58,7 @@ export async function handleMcp(req: Request): Promise<Response> {
           ? asked
           : SUPPORTED_VERSIONS[0],
         capabilities: { tools: {} },
-        serverInfo: { name: "taskd", version: "0.8.0" },
+        serverInfo: { name: "taskd", version: "0.9.0" },
       });
     }
 
