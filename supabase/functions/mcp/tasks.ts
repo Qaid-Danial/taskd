@@ -57,7 +57,9 @@ export async function listTasks(args: Args) {
   if (typeof args.due_before === "string") {
     query = query.lte("due_date", dateArg(args.due_before));
   }
-
+  if (args.unscheduled === true) {
+    query = query.is("planned_for", null).is("due_date", null);
+  }
   const limit = Math.min(Number(args.limit ?? 100), 200);
   const { data, error } = await query.order("priority").order("sort_order")
     .limit(limit);
@@ -74,7 +76,7 @@ export async function getSummary() {
   if (error) throw error;
 
   const byArea: Record<string, number> = {};
-  let overdue = 0, plannedToday = 0, minutesToday = 0;
+  let overdue = 0, plannedToday = 0, minutesToday = 0, unscheduled = 0;
   for (const task of data) {
     const area = task.area ?? "none";
     byArea[area] = (byArea[area] ?? 0) + 1;
@@ -83,6 +85,7 @@ export async function getSummary() {
       plannedToday++;
       minutesToday += task.estimate_minutes ?? 0;
     }
+    if (!task.planned_for && !task.due_date) unscheduled++;
   }
   return {
     today: t,
@@ -91,6 +94,7 @@ export async function getSummary() {
     overdue,
     planned_today: plannedToday,
     minutes_planned_today: minutesToday,
+    unscheduled,
   };
 }
 

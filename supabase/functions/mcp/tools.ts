@@ -11,6 +11,8 @@ const PRIORITY =
   "Priority: 1 = urgent and important, 2 = important, 3 = normal, 4 = someday.";
 const DATES =
   "Dates are YYYY-MM-DD or the word 'today', in Malaysia time (Asia/Kuala_Lumpur).";
+const FLOATING =
+  "A task with no planned_for and no due_date is a floating task. When the user calls tasks floating, or gives no day or deadline, leave both dates out. Never make up a date the user did not give.";
 
 const taskFields = {
   title: { type: "string", maxLength: 200 },
@@ -22,10 +24,13 @@ const taskFields = {
   },
   tags: { type: "array", items: { type: "string" } },
   planned_for: {
-    type: "string",
-    description: "Day the user intends to work on it",
+    type: ["string", "null"],
+    description: "Day the user intends to work on it. null removes it.",
   },
-  due_date: { type: "string", description: "Hard deadline" },
+  due_date: {
+    type: ["string", "null"],
+    description: "Hard deadline. null removes it.",
+  },
   estimate_minutes: { type: "integer", minimum: 1 },
 };
 
@@ -39,7 +44,7 @@ export const tools: Tool[] = [
   {
     name: "list_tasks",
     description:
-      `List the user's tasks. Defaults to open tasks (todo and doing). ${DATES} ${PRIORITY} The result includes today's date.`,
+      `List the user's tasks. Defaults to open tasks (todo and doing). Set unscheduled to list only floating tasks. ${DATES} ${PRIORITY} The result includes today's date.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -56,6 +61,10 @@ export const tools: Tool[] = [
           type: "string",
           description: "Tasks due on or before this date",
         },
+        unscheduled: {
+          type: "boolean",
+          description: "Only floating tasks (no planned day and no due date)",
+        },
         limit: { type: "integer", maximum: 200 },
       },
     },
@@ -70,7 +79,7 @@ export const tools: Tool[] = [
   },
   {
     name: "add_task",
-    description: `Create a task. ${DATES} ${PRIORITY}`,
+    description: `Create a task. ${DATES} ${FLOATING} ${PRIORITY}`,
     inputSchema: {
       type: "object",
       properties: taskFields,
@@ -81,7 +90,7 @@ export const tools: Tool[] = [
   {
     name: "update_task",
     description:
-      `Change fields on one task. Only include the fields to change. ${DATES} ${PRIORITY}`,
+      `Change fields on one task. Only include the fields to change. To make a task floating, set planned_for and due_date to null. ${DATES} ${PRIORITY}`,
     inputSchema: {
       type: "object",
       properties: {
