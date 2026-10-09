@@ -16,7 +16,6 @@ Only the latest release gets fixes.
 Please **don't open a public issue** for a security problem.
 
 - Preferred: use GitHub's private reporting. Go to the **Security** tab of this repository and click **Report a vulnerability**.
-- Or email: `<your-security-contact-email>`
 
 Please include:
 - what you found and where (file, endpoint, tool name or TUI screen),
