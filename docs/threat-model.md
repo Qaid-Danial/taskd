@@ -1,6 +1,6 @@
 # taskd threat model
 
-Version: v0.9.0 · Last reviewed: 2026-10-07
+Version: v0.9.0 · Last reviewed: 2026-10-09
 
 This document lists what taskd protects, who might attack it, what stops them, and what risk is left over. It uses [STRIDE](https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats) to group threats.
 
@@ -61,11 +61,12 @@ Assumptions: Supabase and Anthropic platforms are trusted. There is one user (me
 | T15 | Elevation of privilege | Filter injection: a crafted user ID or date changes the PostgREST query (e.g. `x,user_id.neq.x`) and returns other users' rows | Config rejects a user ID that isn't a UUID; dates re-validated as `YYYY-MM-DD`; the owner filter is added last in one function so callers can't drop it; Go tests cover each case | Relies on every new query going through the same function |
 | T16 | Info disclosure | Key sniffed in transit by a misconfigured URL | The TUI refuses non-`https` URLs except `127.0.0.1` / `localhost` | None known |
 | T17 | Tampering | The TUI accidentally changes data | Read-only by design: the client only sends `GET` | Goes away as a guarantee once editing is added; revisit then |
+| T18 | Spoofing | A stranger uses the public anon (publishable) key to sign up, gets a real `authenticated` session, and uses up my email quota or probes RLS from the inside | Public sign-ups disabled in the dashboard and with `enable_signup = false` in `supabase/config.toml`; RLS limits any account to its own rows | An account created by me or by the service role still gets in. When OTP login lands, the CLI must call `signInWithOtp` with `shouldCreateUser: false`, so a typo'd or unknown email can't create a user |
 
 ## 5. Planned improvements
 
 These are tracked as GitHub issues in the v1.0.0 milestone or later:
-- OTP login for the TUI, replacing the service role key with the user's JWT (T14, T15).
+- OTP login for the TUI, replacing the service role key with the user's JWT (T14, T15). It must send `shouldCreateUser: false` (T18).
 - OAuth 2.1 for the connector, with the token in an `Authorization` header (T1, T2).
 - MCP server acting as the signed-in user so RLS covers Claude too (T4, T10).
 - gitleaks pre-commit hook and CI scan (T13).
