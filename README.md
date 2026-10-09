@@ -4,6 +4,8 @@ A personal task manager where Claude is the main interface. You ask Claude thing
 
 Built as a learning and portfolio project, with a focus on backend and security design.
 
+**Status:** v0.9.0. The database, MCP server and a read-only terminal UI work. Editing and OTP login come in v1.0.
+
 ## How it works
 
 ```mermaid
@@ -33,6 +35,8 @@ flowchart LR
 | Tenant isolation | RLS policies (`user_id = (select auth.uid())`) on both tables, verified by pgTAP tests. |
 | Secrets in git | `.env` files are git-ignored. Production secrets live in `supabase secrets`. |
 | TUI credentials (v0.9) | The TUI is read-only (GET requests only). Its key lives in a user environment variable, never in the repo. One function adds the owner filter to every query, the user ID and dates are validated before they reach the query string, and `https` is enforced. Only the `store` package ever sees the key. Temporary until OTP login (see To-Do). |
+
+For the threats, mitigations and known limits, see the [threat model](docs/threat-model.md). To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## MCP tools
 
@@ -198,7 +202,7 @@ Use a different `MCP_SECRET` in production than locally. See [`supabase/function
 - [x] Embed `time/tzdata` so "today" is Malaysia time on any machine
 - [ ] Replace the service role key in the TUI with email OTP login (user JWT, so RLS applies)
 - [ ] `taskd login`: sign in with an email OTP code from Supabase Auth
-- [ ] Store the refresh token in Windows Credential Manager (`go-keyring`), never in a plain file
+- [ ] Store the refresh token in the OS keyring with `go-keyring` (Windows Credential Manager, Linux Secret Service), never in a plain file
 - [ ] Editing in the TUI: mark done, add, reschedule
 - [ ] `taskd today`, `taskd add`, `taskd done`: one-shot commands for scripts
 
